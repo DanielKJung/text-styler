@@ -4,6 +4,12 @@ This plugin for [Obsidian](https://obsidian.md/) allows you to easily apply and 
 
 *(Optional: Consider adding a screenshot or GIF demonstrating the plugin here)*
 
+## Credits
+This project is inspired by Erinc Ayaz's Colored Text obsidian plugin.
+Check it out here:
+https://github.com/erincayaz/obsidian-colored-text
+
+
 ## Features
 
 *   **Multiple Style Types:**
