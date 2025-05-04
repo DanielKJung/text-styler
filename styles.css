@@ -1,0 +1,105 @@
+/* Base styles for status bar items (can reuse/adapt from original) */
+.styler-status-bar-item {
+	display: flex;
+	align-items: center;
+	padding: 0 5px;
+}
+
+.styler-color-palette,
+.styler-highlight-palette {
+	display: flex;
+	margin: 0 5px;
+}
+
+.styler-color-cell {
+    width: 15px;
+    height: 15px;
+    border-width: 1.5px;
+    border-color: var(--text-muted); /* Use Obsidian variables */
+    border-style: solid; /* Default border */
+    margin-left: 2px;
+    margin-right: 2px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.styler-color-cell.selected {
+	border-color: var(--text-accent); /* Highlight selected */
+    box-shadow: 0 0 3px var(--text-accent);
+    border-width: 2px;
+}
+
+/* ---- CSS Classes for Text Styles ---- */
+/* These are applied via JS/Commands to the editor content */
+
+/* Bold */
+.styler-bold {
+	font-weight: bold;
+}
+
+/* Italic */
+.styler-italic {
+	font-style: italic;
+}
+
+/* Underline */
+.styler-underline {
+	text-decoration: underline;
+    /* Optional: Add thickness, style if needed */
+    /* text-decoration-thickness: 1px; */
+    /* text-decoration-style: solid; */
+}
+
+/* Strikethrough */
+.styler-strike {
+	text-decoration: line-through;
+}
+
+/* --- Combined Decorations --- */
+/* Handle combinations gracefully - browser usually handles this */
+.styler-underline.styler-strike {
+    /* Browsers typically stack text-decoration */
+    text-decoration: underline line-through;
+}
+
+/* Note: Color and Highlight are primarily handled by inline styles
+   added to the span, but you could add generic classes if needed
+   for selection or other purposes, e.g.: */
+/* .styler-colored { */
+    /* Maybe add a subtle indicator? Optional. */
+/* } */
+
+/* .styler-highlighted { */
+	/* Default highlight appearance if style fails? Optional. */
+    /* background-color: yellow; */
+/* } */
+
+
+/* Style for the icons in the status bar */
+.styler-status-icon {
+    margin: 0 3px;
+    color: var(--text-muted);
+}
+.styler-status-icon.active {
+    color: var(--text-accent);
+}
+
+
+/* =========
+
+
+/* Circled Text */
+.styler-circled {
+    border: 1px solid currentColor; /* Use text color for border */
+    border-radius: 1em; /* Make it rounded (oval/pill shape) */
+    padding: 0.05em 0.3em; /* Add some space inside the border */
+    box-decoration-break: clone; /* Helps with wrapping */
+    -webkit-box-decoration-break: clone; /* For older webkit */
+    /* display: inline-block; might cause weird line spacing issues, avoid if possible */
+    /* white-space: nowrap; /* Prevent breaking inside the circle? Optional */
+}
+
+/* Optional base for colored underline (might not be needed if always inline) */
+.styler-colored-underline {
+    /* text-decoration: underline; */ /* Let inline style handle this */
+}
