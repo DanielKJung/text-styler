@@ -6,7 +6,8 @@ This plugin for [Obsidian](https://obsidian.md/) allows you to easily apply and 
 
 ## Credits
 This project is inspired by Erinc Ayaz's Colored Text obsidian plugin.
-Check it out here:
+Significant refactoring and new features have been added.
+Check out the original Colored Text plugin here:
 https://github.com/erincayaz/obsidian-colored-text
 
 
