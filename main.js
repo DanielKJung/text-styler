@@ -25250,7 +25250,7 @@ var import_obsidian4 = require("obsidian");
 var StyleManager = class {
   // --- Public API ---
   toggleStyle(editor, styleType, value = null) {
-    var _a, _b, _c, _d;
+    var _a;
     const selection = editor.listSelections()[0];
     if (!selection)
       return;
@@ -25275,20 +25275,21 @@ var StyleManager = class {
     let hasDifferentValue = false;
     let isSameValueActive = false;
     if ((styleType === "colored-underline" || styleType === "color" || styleType === "highlight") && value) {
-      const styleProp = styleType === "colored-underline" ? "text-decoration-color" : styleType === "color" ? "color" : "background-color";
+      const varToCheck = styleType === "colored-underline" ? "--styler-underline-color" : styleType === "color" ? "--styler-text-color" : "--styler-highlight-color";
       for (const segment of segments) {
-        if ((_a = segment.span) == null ? void 0 : _a.style[styleProp]) {
+        const currentVarValue = this.getCssVariableValue(segment.span, varToCheck);
+        if (currentVarValue !== null) {
           isCurrentlyActive = true;
-          const currentColor = (_b = segment.span.style[styleProp]) == null ? void 0 : _b.toLowerCase();
-          if (currentColor === value.toLowerCase()) {
+          if (currentVarValue.toLowerCase() === value.toLowerCase()) {
             isSameValueActive = true;
           } else {
             hasDifferentValue = true;
           }
         }
-        if (styleType === "colored-underline" && ((_c = segment.span) == null ? void 0 : _c.classList.includes(`${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}`))) {
+        const markerClass = styleType === "colored-underline" ? `${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}` : styleType === "color" ? `${CLASS_PREFIX}${StyleClasses.COLORED}` : `${CLASS_PREFIX}${StyleClasses.HIGHLIGHTED}`;
+        if ((_a = segment.span) == null ? void 0 : _a.classList.includes(markerClass)) {
           isCurrentlyActive = true;
-          if (!((_d = segment.span) == null ? void 0 : _d.style[styleProp])) {
+          if (currentVarValue === null) {
             hasDifferentValue = true;
           }
         }
@@ -25320,26 +25321,42 @@ var StyleManager = class {
     const from2 = selection.anchor.line < selection.head.line || selection.anchor.line === selection.head.line && selection.anchor.ch <= selection.head.ch ? selection.anchor : selection.head;
     const to = from2 === selection.anchor ? selection.head : selection.anchor;
     const originalContent = editor.getRange(from2, to);
-    const plainText = originalContent.replace(/<span[^>]*>|<\/span>/gi, "");
-    editor.replaceRange(plainText, from2, to);
+    let modifiedContent = "";
+    const segments = this.parseSelection(originalContent, from2, editor);
+    segments.forEach((segment) => {
+      modifiedContent += segment.text;
+    });
+    editor.replaceRange(modifiedContent, from2, to);
   }
   // --- Private Helpers ---
   applyModificationToSegment(text, spanInfo, styleType, value, shouldApply) {
     var _a;
     let currentClasses = spanInfo ? [...spanInfo.classList] : [];
-    let currentStyles = spanInfo ? { ...spanInfo.style } : {};
-    const classBasedStyleTypes = {
+    let currentCssVariables = {};
+    if (spanInfo == null ? void 0 : spanInfo.startTag) {
+      const styleAttr = ((_a = spanInfo.startTag.match(/style="([^"]*)"/i)) == null ? void 0 : _a[1]) || "";
+      styleAttr.split(";").forEach((part) => {
+        const [key, val] = part.split(":");
+        const trimmedKey = key == null ? void 0 : key.trim();
+        if (trimmedKey == null ? void 0 : trimmedKey.startsWith("--styler-")) {
+          currentCssVariables[trimmedKey] = (val == null ? void 0 : val.trim()) || "";
+        }
+      });
+    }
+    const classMap = {
       "bold": StyleClasses.BOLD,
       "italic": StyleClasses.ITALIC,
       "underline": StyleClasses.UNDERLINE,
-      // Standard underline class
       "strike": StyleClasses.STRIKE,
       "circled": StyleClasses.CIRCLED,
-      // Class for circled
+      "color": StyleClasses.COLORED,
+      // Marker class
+      "highlight": StyleClasses.HIGHLIGHTED,
+      // Marker class
       "colored-underline": StyleClasses.COLORED_UNDERLINE
-      // Marker class for colored underline
+      // Marker class
     };
-    const targetClass = styleType in classBasedStyleTypes ? `${CLASS_PREFIX}${classBasedStyleTypes[styleType]}` : null;
+    const targetClass = styleType in classMap ? `${CLASS_PREFIX}${classMap[styleType]}` : null;
     if (shouldApply) {
       if (targetClass) {
         if (!currentClasses.includes(targetClass)) {
@@ -25347,66 +25364,65 @@ var StyleManager = class {
         }
       }
       if (styleType === "color" && value) {
-        currentStyles["color"] = value;
+        currentCssVariables["--styler-text-color"] = value;
       } else if (styleType === "highlight" && value) {
-        currentStyles["background-color"] = value;
+        currentCssVariables["--styler-highlight-color"] = value;
       } else if (styleType === "colored-underline" && value) {
-        currentStyles["text-decoration-line"] = this.addDecoration(currentStyles["text-decoration-line"], "underline");
-        currentStyles["text-decoration-color"] = value;
-        currentStyles["text-decoration-thickness"] = "3px";
+        currentCssVariables["--styler-underline-color"] = value;
+        currentCssVariables["--styler-underline-thickness"] = "3px";
         currentClasses = currentClasses.filter((cls) => cls !== `${CLASS_PREFIX}${StyleClasses.UNDERLINE}`);
       } else if (styleType === "underline") {
-        currentStyles["text-decoration-line"] = this.addDecoration(currentStyles["text-decoration-line"], "underline");
-        delete currentStyles["text-decoration-color"];
-        delete currentStyles["text-decoration-thickness"];
+        delete currentCssVariables["--styler-underline-color"];
+        delete currentCssVariables["--styler-underline-thickness"];
         currentClasses = currentClasses.filter((cls) => cls !== `${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}`);
-      } else if (styleType === "strike") {
-        currentStyles["text-decoration-line"] = this.addDecoration(currentStyles["text-decoration-line"], "line-through");
       }
     } else {
       if (targetClass) {
         currentClasses = currentClasses.filter((cls) => cls !== targetClass);
       }
       if (styleType === "color") {
-        delete currentStyles["color"];
+        delete currentCssVariables["--styler-text-color"];
       } else if (styleType === "highlight") {
-        delete currentStyles["background-color"];
+        delete currentCssVariables["--styler-highlight-color"];
       } else if (styleType === "colored-underline") {
-        delete currentStyles["text-decoration-color"];
-        delete currentStyles["text-decoration-thickness"];
-        if (!currentClasses.includes(`${CLASS_PREFIX}${StyleClasses.UNDERLINE}`)) {
-          currentStyles["text-decoration-line"] = this.removeDecoration(currentStyles["text-decoration-line"], "underline");
-        }
+        delete currentCssVariables["--styler-underline-color"];
+        delete currentCssVariables["--styler-underline-thickness"];
       } else if (styleType === "underline") {
-        if (!currentClasses.includes(`${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}`)) {
-          currentStyles["text-decoration-line"] = this.removeDecoration(currentStyles["text-decoration-line"], "underline");
-        }
-        delete currentStyles["text-decoration-thickness"];
-      } else if (styleType === "strike") {
-        currentStyles["text-decoration-line"] = this.removeDecoration(currentStyles["text-decoration-line"], "line-through");
+        delete currentCssVariables["--styler-underline-color"];
+        delete currentCssVariables["--styler-underline-thickness"];
       }
     }
-    if (((_a = currentStyles["text-decoration-line"]) == null ? void 0 : _a.trim()) === "" || currentStyles["text-decoration-line"] === "none") {
-      delete currentStyles["text-decoration-line"];
+    const hasAnyUnderlineClass = currentClasses.includes(`${CLASS_PREFIX}${StyleClasses.UNDERLINE}`) || currentClasses.includes(`${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}`);
+    if (!hasAnyUnderlineClass) {
+      delete currentCssVariables["--styler-underline-color"];
+      delete currentCssVariables["--styler-underline-thickness"];
     }
-    if (!currentStyles["text-decoration-line"]) {
-      delete currentStyles["text-decoration-color"];
-      delete currentStyles["text-decoration-thickness"];
+    if (currentClasses.includes(`${CLASS_PREFIX}${StyleClasses.UNDERLINE}`) || !currentClasses.includes(`${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}`)) {
+      delete currentCssVariables["--styler-underline-color"];
+      delete currentCssVariables["--styler-underline-thickness"];
     }
-    if (currentStyles["text-decoration-line"] && !currentStyles["text-decoration-color"]) {
-      delete currentStyles["text-decoration-color"];
-      delete currentStyles["text-decoration-thickness"];
+    if (!currentCssVariables["--styler-text-color"]) {
+      currentClasses = currentClasses.filter((cls) => cls !== `${CLASS_PREFIX}${StyleClasses.COLORED}`);
     }
-    const styleString = Object.entries(currentStyles).map(([k2, v2]) => `${k2}: ${v2};`).join(" ");
-    const hasClasses = currentClasses.length > 0;
-    const hasStyles = styleString.trim().length > 0;
+    if (!currentCssVariables["--styler-highlight-color"]) {
+      currentClasses = currentClasses.filter((cls) => cls !== `${CLASS_PREFIX}${StyleClasses.HIGHLIGHTED}`);
+    }
+    if (!currentCssVariables["--styler-underline-color"]) {
+      currentClasses = currentClasses.filter((cls) => cls !== `${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}`);
+      delete currentCssVariables["--styler-underline-thickness"];
+    }
+    const variableString = Object.entries(currentCssVariables).map(([k2, v2]) => `${k2}: ${v2};`).join(" ");
+    const styleAttrValue = variableString.trim();
+    const uniqueClasses = [...new Set(currentClasses)].filter(Boolean);
+    const hasClasses = uniqueClasses.length > 0;
+    const hasStyles = styleAttrValue.length > 0;
     if (hasClasses || hasStyles) {
       let openingTag = "<span";
       if (hasClasses) {
-        openingTag += ` class="${currentClasses.join(" ")}"`;
+        openingTag += ` class="${uniqueClasses.join(" ")}"`;
       }
       if (hasStyles) {
-        openingTag += ` style="${styleString.trim()}"`;
+        openingTag += ` style="${styleAttrValue}"`;
       }
       openingTag += ">";
       return `${openingTag}${text}</span>`;
@@ -25414,113 +25430,88 @@ var StyleManager = class {
       return text;
     }
   }
-  // Helper to add text-decoration values safely
-  addDecoration(existing, add) {
-    if (!existing || existing.trim() === "" || existing === "none")
-      return add;
-    const parts = existing.split(" ").filter((p2) => p2.trim() !== "");
-    if (!parts.includes(add)) {
-      parts.push(add);
-    }
-    return parts.join(" ");
-  }
-  // Helper to remove text-decoration values safely
-  removeDecoration(existing, remove) {
-    if (!existing || existing.trim() === "" || existing === "none")
-      return "none";
-    const parts = existing.split(" ").filter((p2) => p2.trim() !== "" && p2 !== remove);
-    return parts.length > 0 ? parts.join(" ") : "none";
-  }
-  // Simple check if the style exists anywhere in the segments
   isStyleActiveInSegments(segments, styleType, value) {
-    var _a;
     const classChecks = {
       "bold": `${CLASS_PREFIX}${StyleClasses.BOLD}`,
       "italic": `${CLASS_PREFIX}${StyleClasses.ITALIC}`,
       "underline": `${CLASS_PREFIX}${StyleClasses.UNDERLINE}`,
-      // Standard underline class
       "strike": `${CLASS_PREFIX}${StyleClasses.STRIKE}`,
       "circled": `${CLASS_PREFIX}${StyleClasses.CIRCLED}`,
-      // Circled class
+      "color": `${CLASS_PREFIX}${StyleClasses.COLORED}`,
+      "highlight": `${CLASS_PREFIX}${StyleClasses.HIGHLIGHTED}`,
       "colored-underline": `${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}`
-      // Colored underline marker class
     };
-    const styleChecks = {
-      "color": "color",
-      "highlight": "background-color",
-      "colored-underline": "text-decoration-color",
-      // Check for color style presence
-      "underline": "text-decoration-line",
-      // Check if 'underline' is in line style
-      "strike": "text-decoration-line"
-      // Check if 'line-through' is in line style
+    const varChecks = {
+      "color": "--styler-text-color",
+      "highlight": "--styler-highlight-color",
+      "colored-underline": "--styler-underline-color"
     };
     const targetClass = classChecks[styleType];
-    const targetStyleProp = styleChecks[styleType];
+    const targetVar = varChecks[styleType];
     for (const segment of segments) {
       if (segment.span) {
-        if (targetClass && segment.span.classList.includes(targetClass)) {
-          if (styleType === "underline") {
-            if (!segment.span.style["text-decoration-color"] && !segment.span.classList.includes(`${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}`)) {
-              return true;
+        let isClassActive = targetClass ? segment.span.classList.includes(targetClass) : false;
+        let isVarActive = false;
+        if (targetVar) {
+          const varValue = this.getCssVariableValue(segment.span, targetVar);
+          if (varValue !== null) {
+            if (value) {
+              if (varValue.toLowerCase() === value.toLowerCase()) {
+                isVarActive = true;
+              }
+            } else {
+              isVarActive = true;
             }
-          } else if (styleType === "colored-underline") {
-            if (value && ((_a = segment.span.style["text-decoration-color"]) == null ? void 0 : _a.toLowerCase()) === value.toLowerCase()) {
-              return true;
-            }
-          } else {
-            return true;
           }
         }
-        if (targetStyleProp) {
-          const currentStyleValue = segment.span.style[targetStyleProp];
-          if (currentStyleValue && currentStyleValue !== "none") {
-            if (styleType === "color" || styleType === "highlight") {
-              if (value && currentStyleValue.toLowerCase() === value.toLowerCase())
-                return true;
-              if (!value && (segment.span.style["color"] || segment.span.style["background-color"]))
-                return true;
-            } else if (styleType === "colored-underline") {
-              if (segment.span.style["text-decoration-color"]) {
-                if (value && segment.span.style["text-decoration-color"].toLowerCase() === value.toLowerCase()) {
-                  return true;
-                }
-                if (!value) {
-                  return true;
-                }
-              }
-            } else if (styleType === "underline") {
-              if (currentStyleValue.split(" ").includes("underline")) {
-                if (!segment.span.style["text-decoration-color"] && !segment.span.classList.includes(`${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}`)) {
-                  return true;
-                }
-              }
-            } else if (styleType === "strike") {
-              if (currentStyleValue.split(" ").includes("line-through")) {
-                return true;
-              }
-            }
-          }
+        if (styleType === "bold" || styleType === "italic" || styleType === "circled" || styleType === "strike") {
+          if (isClassActive)
+            return true;
+        } else if (styleType === "underline") {
+          const isColoredActive = this.hasCssVariable(segment.span, "--styler-underline-color") || segment.span.classList.includes(`${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}`);
+          if (isClassActive && !isColoredActive)
+            return true;
+        } else if (styleType === "color" || styleType === "highlight" || styleType === "colored-underline") {
+          if (isVarActive)
+            return true;
+          if (isClassActive && value === null)
+            return true;
         }
       }
     }
     return false;
   }
-  // Creates a new span tag string
+  // Helper to check for CSS Variable existence in the style attribute
+  hasCssVariable(spanInfo, varName) {
+    var _a;
+    if (!(spanInfo == null ? void 0 : spanInfo.startTag))
+      return false;
+    const styleAttr = ((_a = spanInfo.startTag.match(/style="([^"]*)"/i)) == null ? void 0 : _a[1]) || "";
+    const regex = new RegExp(`(^|;)\\s*${varName}\\s*:`);
+    return regex.test(styleAttr);
+  }
+  // Helper to get CSS Variable value from the style attribute
+  getCssVariableValue(spanInfo, varName) {
+    var _a;
+    if (!(spanInfo == null ? void 0 : spanInfo.startTag))
+      return null;
+    const styleAttr = ((_a = spanInfo.startTag.match(/style="([^"]*)"/i)) == null ? void 0 : _a[1]) || "";
+    const regex = new RegExp(`${varName}\\s*:\\s*([^;]+)`);
+    const match2 = styleAttr.match(regex);
+    return match2 && match2[1] ? match2[1].trim() : null;
+  }
+  // Creates a new span tag string (using CSS variable approach)
   createStyledSpan(text, styleType, value, existingSpanInfo) {
-    const segment = { text, span: existingSpanInfo };
-    return this.applyModificationToSegment(text, existingSpanInfo, styleType, value, true);
+    return this.applyModificationToSegment(text, null, styleType, value, true);
   }
   // --- Parsing Logic (Simplified) ---
-  // This is the most complex part and needs refinement for robustness.
-  // It iterates through the text, identifying spans and plain text segments.
+  // No changes needed in parseSelection, extractClasses, extractStyles
   parseSelection(selectedText, from2, editor) {
     const segments = [];
     let currentIndex = 0;
     const len = selectedText.length;
     const tagRegex = /<\/?span[^>]*>/gi;
     let match2;
-    let lastTagEnd = 0;
     let currentSpanInfo = null;
     while (currentIndex < len) {
       const remainingText = selectedText.substring(currentIndex);
@@ -25534,7 +25525,6 @@ var StyleManager = class {
           start: currentIndex,
           end: textEnd,
           span: currentSpanInfo
-          // Inherit span info from previous tag
         });
       }
       if (match2) {
@@ -25549,11 +25539,10 @@ var StyleManager = class {
           currentSpanInfo = {
             startTag: tagText,
             startTagOffset: tagActualStart,
-            // Relative to selection start
             endTagOffset: -1,
-            // Need to find matching end tag (hard in this simple parser)
             classList,
             style
+            // Parsed direct styles (may incorrectly include vars initially)
           };
         }
         currentIndex = tagActualEnd;
@@ -25575,6 +25564,8 @@ var StyleManager = class {
     const classMatch = tag.match(/class="([^"]*)"/i);
     return classMatch && classMatch[1] ? classMatch[1].split(" ").filter(Boolean) : [];
   }
+  // Note: extractStyles might incorrectly parse CSS variables as direct styles here.
+  // The logic in applyModificationToSegment re-parses the style attribute more carefully.
   extractStyles(tag) {
     const styleMatch = tag.match(/style="([^"]*)"/i);
     const styles = {};

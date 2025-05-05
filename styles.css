@@ -1,4 +1,4 @@
-/* Base styles for status bar items (can reuse/adapt from original) */
+/* Base styles for status bar items */
 .styler-status-bar-item {
 	display: flex;
 	align-items: center;
@@ -29,8 +29,19 @@
     border-width: 2px;
 }
 
+/* Style for the icons in the status bar */
+.styler-status-icon {
+    margin: 0 3px;
+    color: var(--text-muted);
+}
+.styler-status-icon.active {
+    color: var(--text-accent);
+}
+
+
 /* ---- CSS Classes for Text Styles ---- */
-/* These are applied via JS/Commands to the editor content */
+
+/* --- Direct Styles --- */
 
 /* Bold */
 .styler-bold {
@@ -42,64 +53,61 @@
 	font-style: italic;
 }
 
-/* Underline */
+/* Standard Underline (Class-based) */
 .styler-underline {
-	text-decoration: underline;
-    /* Optional: Add thickness, style if needed */
-    /* text-decoration-thickness: 1px; */
-    /* text-decoration-style: solid; */
+    /* Apply standard underline if this class is present */
+    /* Respects combinations if line-through is also set directly */
+	text-decoration-line: underline;
+    /* Explicitly reset color/thickness that might be inherited or set by themes */
+    text-decoration-color: inherit;
+    text-decoration-thickness: auto;
 }
 
-/* Strikethrough */
+/* Strikethrough (Class-based) */
 .styler-strike {
-	text-decoration: line-through;
+    /* Apply line-through if this class is present */
+    /* Respects combinations if underline is also set directly */
+	text-decoration-line: line-through;
 }
-
-/* --- Combined Decorations --- */
-/* Handle combinations gracefully - browser usually handles this */
-.styler-underline.styler-strike {
-    /* Browsers typically stack text-decoration */
-    text-decoration: underline line-through;
-}
-
-/* Note: Color and Highlight are primarily handled by inline styles
-   added to the span, but you could add generic classes if needed
-   for selection or other purposes, e.g.: */
-/* .styler-colored { */
-    /* Maybe add a subtle indicator? Optional. */
-/* } */
-
-/* .styler-highlighted { */
-	/* Default highlight appearance if style fails? Optional. */
-    /* background-color: yellow; */
-/* } */
-
-
-/* Style for the icons in the status bar */
-.styler-status-icon {
-    margin: 0 3px;
-    color: var(--text-muted);
-}
-.styler-status-icon.active {
-    color: var(--text-accent);
-}
-
-
-/* =========
-
 
 /* Circled Text */
 .styler-circled {
-    border: 1px solid currentColor; /* Use text color for border */
+    border: 1px solid currentColor; /* Use current text color for border */
     border-radius: 1em; /* Make it rounded (oval/pill shape) */
     padding: 0.05em 0.3em; /* Add some space inside the border */
-    box-decoration-break: clone; /* Helps with wrapping */
-    -webkit-box-decoration-break: clone; /* For older webkit */
-    /* display: inline-block; might cause weird line spacing issues, avoid if possible */
-    /* white-space: nowrap; /* Prevent breaking inside the circle? Optional */
+    /* Helps rendering borders/padding correctly when inline elements wrap lines */
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
 }
 
-/* Optional base for colored underline (might not be needed if always inline) */
-.styler-colored-underline {
-    /* text-decoration: underline; */ /* Let inline style handle this */
+/* --- Variable-Based Styles --- */
+
+/* Text Color */
+.styler-colored {
+    /* Apply the color using the variable defined inline */
+    color: var(--styler-text-color, inherit); /* Fallback to inheriting color */
 }
+
+/* Highlight Color */
+.styler-highlighted {
+    /* Apply the background color using the variable defined inline */
+    background-color: var(--styler-highlight-color, transparent); /* Fallback to transparent */
+}
+
+/* Colored Underline */
+.styler-colored-underline {
+    /* Apply color and thickness using variables defined inline */
+    /* Ensure an underline line is present */
+    text-decoration-line: underline;
+    text-decoration-color: var(--styler-underline-color, currentColor); /* Fallback to text color */
+    text-decoration-thickness: var(--styler-underline-thickness, auto); /* Fallback to default */
+}
+
+/* --- Combined Decorations --- */
+/* Browsers handle combining text-decoration-line values (e.g., underline line-through) */
+/* StyleManager sets text-decoration-line directly based on active styles */
+
+/* Example of how standard underline and strike might combine visually if both classes are present */
+/* .styler-underline.styler-strike { */
+    /* text-decoration-line: underline line-through; */ /* Browser default behavior usually handles this */
+/* } */

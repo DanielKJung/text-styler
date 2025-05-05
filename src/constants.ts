@@ -33,11 +33,11 @@ export const DEFAULT_SETTINGS: Readonly<PluginSettings> = {
     highlightColorSlots: DEFAULT_COLOR_SLOTS,
     highlightColors: Array(DEFAULT_COLOR_SLOTS).fill(DEFAULT_HIGHLIGHT_COLOR),
     favoriteHighlightColors: [ // Example highlight favorites
-        "#ffff00", // Yellow
-        "#ffa500", // Orange
-        "#add8e6", // Light Blue
-        "#90ee90", // Light Green
-        "#ffb6c1", // Light Pink
+        "#FFEDAB", // Yellow
+        "#FBD2BA", // Orange
+        "#C4E0F7", // Light Blue
+        "#B2F0C8", // Light Green
+        "#FFBDBA", // Light Pink
         "#d3d3d3", // Light Grey
     ],
     selectedHighlightColorIndex: 0,
