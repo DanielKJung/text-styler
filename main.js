@@ -23569,6 +23569,8 @@ var MAX_COLOR_SLOTS = 20;
 var DEFAULT_COLOR_SLOTS = 5;
 var DEFAULT_TEXT_COLOR = "#000000";
 var DEFAULT_HIGHLIGHT_COLOR = "#ffff00";
+var DEFAULT_COLORED_UNDERLINE_THICKNESS = 3;
+var DEFAULT_CIRCLE_THICKNESS = 1;
 var CLASS_PREFIX = "styler-";
 var StyleClasses = {
   BOLD: "bold",
@@ -23604,20 +23606,22 @@ var DEFAULT_SETTINGS = {
   highlightColors: Array(DEFAULT_COLOR_SLOTS).fill(DEFAULT_HIGHLIGHT_COLOR),
   favoriteHighlightColors: [
     // Example highlight favorites
-    "#ffff00",
+    "#FFEDAB",
     // Yellow
-    "#ffa500",
+    "#FBD2BA",
     // Orange
-    "#add8e6",
+    "#C4E0F7",
     // Light Blue
-    "#90ee90",
+    "#B2F0C8",
     // Light Green
-    "#ffb6c1",
+    "#FFBDBA",
     // Light Pink
     "#d3d3d3"
     // Light Grey
   ],
-  selectedHighlightColorIndex: 0
+  selectedHighlightColorIndex: 0,
+  coloredUnderlineThickness: DEFAULT_COLORED_UNDERLINE_THICKNESS,
+  circleThickness: DEFAULT_CIRCLE_THICKNESS
 };
 
 // src/settingsTab.ts
@@ -23660,6 +23664,27 @@ var StylerSettingsTab = class extends import_obsidian.PluginSettingTab {
     );
     this.favoriteHighlightColorsSetting = new import_obsidian.Setting(containerEl).setName("Favorite Highlight Colors").setDesc("Set your favorite highlight colors for the picker modal.");
     this.renderColorPickers(this.favoriteHighlightColorsSetting, this.plugin.settings.favoriteHighlightColors, "highlight");
+    containerEl.createEl("h3", { text: "Style Appearance" });
+    new import_obsidian.Setting(containerEl).setName("Colored Underline Thickness").setDesc("Set the thickness of the colored underline in pixels (e.g., 2, 3, 4).").addText(
+      (text) => text.setPlaceholder(String(DEFAULT_COLORED_UNDERLINE_THICKNESS)).setValue(String(this.plugin.settings.coloredUnderlineThickness)).onChange(async (value) => {
+        let num = parseInt(value);
+        if (isNaN(num) || num < 1)
+          num = DEFAULT_COLORED_UNDERLINE_THICKNESS;
+        this.plugin.settings.coloredUnderlineThickness = num;
+        await this.plugin.saveSettings();
+        text.setValue(String(this.plugin.settings.coloredUnderlineThickness));
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Circled Text Border Thickness").setDesc("Set the thickness of the circled text border in pixels (e.g., 1, 2).").addText(
+      (text) => text.setPlaceholder(String(DEFAULT_CIRCLE_THICKNESS)).setValue(String(this.plugin.settings.circleThickness)).onChange(async (value) => {
+        let num = parseInt(value);
+        if (isNaN(num) || num < 1)
+          num = DEFAULT_CIRCLE_THICKNESS;
+        this.plugin.settings.circleThickness = num;
+        await this.plugin.saveSettings();
+        text.setValue(String(this.plugin.settings.circleThickness));
+      })
+    );
   }
   // Helper to render color pickers and handle updates
   renderColorPickers(setting, colorArray, type) {
@@ -25248,6 +25273,24 @@ var StylerStatusBar = class {
 // src/styleManager.ts
 var import_obsidian4 = require("obsidian");
 var StyleManager = class {
+  constructor(plugin) {
+    // --- Private Helpers ---
+    // Define ALL style classes map
+    this.classMap = {
+      "bold": StyleClasses.BOLD,
+      "italic": StyleClasses.ITALIC,
+      "underline": StyleClasses.UNDERLINE,
+      "strike": StyleClasses.STRIKE,
+      "circled": StyleClasses.CIRCLED,
+      "color": StyleClasses.COLORED,
+      // Marker class
+      "highlight": StyleClasses.HIGHLIGHTED,
+      // Marker class
+      "colored-underline": StyleClasses.COLORED_UNDERLINE
+      // Marker class
+    };
+    this.plugin = plugin;
+  }
   // --- Public API ---
   toggleStyle(editor, styleType, value = null) {
     var _a;
@@ -25274,10 +25317,11 @@ var StyleManager = class {
     let isCurrentlyActive = false;
     let hasDifferentValue = false;
     let isSameValueActive = false;
-    if ((styleType === "colored-underline" || styleType === "color" || styleType === "highlight") && value) {
-      const varToCheck = styleType === "colored-underline" ? "--styler-underline-color" : styleType === "color" ? "--styler-text-color" : "--styler-highlight-color";
+    if ((styleType === "colored-underline" || styleType === "color" || styleType === "highlight" || styleType === "circled") && value) {
+      const varToCheck = styleType === "colored-underline" ? "--styler-underline-color" : styleType === "color" ? "--styler-text-color" : styleType === "highlight" ? "--styler-highlight-color" : "--styler-circle-color";
       for (const segment of segments) {
         const currentVarValue = this.getCssVariableValue(segment.span, varToCheck);
+        const markerClass = this.classMap[styleType] ? `${CLASS_PREFIX}${this.classMap[styleType]}` : null;
         if (currentVarValue !== null) {
           isCurrentlyActive = true;
           if (currentVarValue.toLowerCase() === value.toLowerCase()) {
@@ -25285,20 +25329,16 @@ var StyleManager = class {
           } else {
             hasDifferentValue = true;
           }
-        }
-        const markerClass = styleType === "colored-underline" ? `${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}` : styleType === "color" ? `${CLASS_PREFIX}${StyleClasses.COLORED}` : `${CLASS_PREFIX}${StyleClasses.HIGHLIGHTED}`;
-        if ((_a = segment.span) == null ? void 0 : _a.classList.includes(markerClass)) {
+        } else if (markerClass && ((_a = segment.span) == null ? void 0 : _a.classList.includes(markerClass))) {
           isCurrentlyActive = true;
-          if (currentVarValue === null) {
-            hasDifferentValue = true;
-          }
+          hasDifferentValue = true;
         }
       }
     } else {
       isCurrentlyActive = this.isStyleActiveInSegments(segments, styleType, value);
     }
     let shouldApply;
-    if ((styleType === "colored-underline" || styleType === "color" || styleType === "highlight") && value) {
+    if ((styleType === "colored-underline" || styleType === "color" || styleType === "highlight" || styleType === "circled") && value) {
       if (isSameValueActive && !hasDifferentValue) {
         shouldApply = false;
       } else {
@@ -25328,7 +25368,6 @@ var StyleManager = class {
     });
     editor.replaceRange(modifiedContent, from2, to);
   }
-  // --- Private Helpers ---
   applyModificationToSegment(text, spanInfo, styleType, value, shouldApply) {
     var _a;
     let currentClasses = spanInfo ? [...spanInfo.classList] : [];
@@ -25343,20 +25382,7 @@ var StyleManager = class {
         }
       });
     }
-    const classMap = {
-      "bold": StyleClasses.BOLD,
-      "italic": StyleClasses.ITALIC,
-      "underline": StyleClasses.UNDERLINE,
-      "strike": StyleClasses.STRIKE,
-      "circled": StyleClasses.CIRCLED,
-      "color": StyleClasses.COLORED,
-      // Marker class
-      "highlight": StyleClasses.HIGHLIGHTED,
-      // Marker class
-      "colored-underline": StyleClasses.COLORED_UNDERLINE
-      // Marker class
-    };
-    const targetClass = styleType in classMap ? `${CLASS_PREFIX}${classMap[styleType]}` : null;
+    const targetClass = styleType in this.classMap ? `${CLASS_PREFIX}${this.classMap[styleType]}` : null;
     if (shouldApply) {
       if (targetClass) {
         if (!currentClasses.includes(targetClass)) {
@@ -25369,12 +25395,15 @@ var StyleManager = class {
         currentCssVariables["--styler-highlight-color"] = value;
       } else if (styleType === "colored-underline" && value) {
         currentCssVariables["--styler-underline-color"] = value;
-        currentCssVariables["--styler-underline-thickness"] = "3px";
+        currentCssVariables["--styler-underline-thickness"] = `${this.plugin.settings.coloredUnderlineThickness}px`;
         currentClasses = currentClasses.filter((cls) => cls !== `${CLASS_PREFIX}${StyleClasses.UNDERLINE}`);
       } else if (styleType === "underline") {
         delete currentCssVariables["--styler-underline-color"];
         delete currentCssVariables["--styler-underline-thickness"];
         currentClasses = currentClasses.filter((cls) => cls !== `${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}`);
+      } else if (styleType === "circled" && value) {
+        currentCssVariables["--styler-circle-color"] = value;
+        currentCssVariables["--styler-circle-thickness"] = `${this.plugin.settings.circleThickness}px`;
       }
     } else {
       if (targetClass) {
@@ -25390,6 +25419,9 @@ var StyleManager = class {
       } else if (styleType === "underline") {
         delete currentCssVariables["--styler-underline-color"];
         delete currentCssVariables["--styler-underline-thickness"];
+      } else if (styleType === "circled") {
+        delete currentCssVariables["--styler-circle-color"];
+        delete currentCssVariables["--styler-circle-thickness"];
       }
     }
     const hasAnyUnderlineClass = currentClasses.includes(`${CLASS_PREFIX}${StyleClasses.UNDERLINE}`) || currentClasses.includes(`${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}`);
@@ -25411,6 +25443,10 @@ var StyleManager = class {
       currentClasses = currentClasses.filter((cls) => cls !== `${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}`);
       delete currentCssVariables["--styler-underline-thickness"];
     }
+    if (!currentCssVariables["--styler-circle-color"]) {
+      currentClasses = currentClasses.filter((cls) => cls !== `${CLASS_PREFIX}${StyleClasses.CIRCLED}`);
+      delete currentCssVariables["--styler-circle-thickness"];
+    }
     const variableString = Object.entries(currentCssVariables).map(([k2, v2]) => `${k2}: ${v2};`).join(" ");
     const styleAttrValue = variableString.trim();
     const uniqueClasses = [...new Set(currentClasses)].filter(Boolean);
@@ -25431,22 +25467,14 @@ var StyleManager = class {
     }
   }
   isStyleActiveInSegments(segments, styleType, value) {
-    const classChecks = {
-      "bold": `${CLASS_PREFIX}${StyleClasses.BOLD}`,
-      "italic": `${CLASS_PREFIX}${StyleClasses.ITALIC}`,
-      "underline": `${CLASS_PREFIX}${StyleClasses.UNDERLINE}`,
-      "strike": `${CLASS_PREFIX}${StyleClasses.STRIKE}`,
-      "circled": `${CLASS_PREFIX}${StyleClasses.CIRCLED}`,
-      "color": `${CLASS_PREFIX}${StyleClasses.COLORED}`,
-      "highlight": `${CLASS_PREFIX}${StyleClasses.HIGHLIGHTED}`,
-      "colored-underline": `${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}`
-    };
+    const targetClass = styleType in this.classMap ? `${CLASS_PREFIX}${this.classMap[styleType]}` : null;
     const varChecks = {
       "color": "--styler-text-color",
       "highlight": "--styler-highlight-color",
-      "colored-underline": "--styler-underline-color"
+      "colored-underline": "--styler-underline-color",
+      "circled": "--styler-circle-color"
+      // Check circle color variable too
     };
-    const targetClass = classChecks[styleType];
     const targetVar = varChecks[styleType];
     for (const segment of segments) {
       if (segment.span) {
@@ -25464,12 +25492,15 @@ var StyleManager = class {
             }
           }
         }
-        if (styleType === "bold" || styleType === "italic" || styleType === "circled" || styleType === "strike") {
+        if (styleType === "bold" || styleType === "italic" || styleType === "strike") {
           if (isClassActive)
             return true;
         } else if (styleType === "underline") {
           const isColoredActive = this.hasCssVariable(segment.span, "--styler-underline-color") || segment.span.classList.includes(`${CLASS_PREFIX}${StyleClasses.COLORED_UNDERLINE}`);
           if (isClassActive && !isColoredActive)
+            return true;
+        } else if (styleType === "circled") {
+          if (isClassActive || isVarActive && value === null)
             return true;
         } else if (styleType === "color" || styleType === "highlight" || styleType === "colored-underline") {
           if (isVarActive)
@@ -25505,7 +25536,6 @@ var StyleManager = class {
     return this.applyModificationToSegment(text, null, styleType, value, true);
   }
   // --- Parsing Logic (Simplified) ---
-  // No changes needed in parseSelection, extractClasses, extractStyles
   parseSelection(selectedText, from2, editor) {
     const segments = [];
     let currentIndex = 0;
@@ -25540,9 +25570,9 @@ var StyleManager = class {
             startTag: tagText,
             startTagOffset: tagActualStart,
             endTagOffset: -1,
+            // Not accurately determined by this parser
             classList,
             style
-            // Parsed direct styles (may incorrectly include vars initially)
           };
         }
         currentIndex = tagActualEnd;
@@ -25564,8 +25594,8 @@ var StyleManager = class {
     const classMatch = tag.match(/class="([^"]*)"/i);
     return classMatch && classMatch[1] ? classMatch[1].split(" ").filter(Boolean) : [];
   }
-  // Note: extractStyles might incorrectly parse CSS variables as direct styles here.
-  // The logic in applyModificationToSegment re-parses the style attribute more carefully.
+  // Note: This simple parsing is primarily used to get context for segmentation.
+  // applyModificationToSegment re-parses the style attribute more carefully for variables.
   extractStyles(tag) {
     const styleMatch = tag.match(/style="([^"]*)"/i);
     const styles = {};
@@ -25583,7 +25613,6 @@ var StyleManager = class {
 
 // src/main.ts
 var TextStyler = class extends import_obsidian5.Plugin {
-  // Reference to the status bar element
   constructor(app, manifest) {
     super(app, manifest);
     this.statusBar = null;
@@ -25599,6 +25628,8 @@ var TextStyler = class extends import_obsidian5.Plugin {
           const color = (_a = this.statusBar) == null ? void 0 : _a.getCurrentTextColor();
           if (color)
             this.styleManager.toggleStyle(editor, "color", color);
+          else
+            new import_obsidian5.Notice("Text Styler: No text color selected.");
         });
       });
       menu.addItem((item) => {
@@ -25607,17 +25638,19 @@ var TextStyler = class extends import_obsidian5.Plugin {
           const color = (_a = this.statusBar) == null ? void 0 : _a.getCurrentHighlightColor();
           if (color)
             this.styleManager.toggleStyle(editor, "highlight", color);
+          else
+            new import_obsidian5.Notice("Text Styler: No highlight color selected.");
         });
       });
       menu.addSeparator();
       menu.addItem((item) => {
-        item.setTitle("Styler: Toggle Bold").setIcon("bold").onClick(() => this.styleManager.toggleStyle(editor, "bold"));
+        item.setTitle("Styler: Toggle Bold").setIcon("bold").onClick(() => this.styleManager.toggleStyle(editor, "bold", null));
       });
       menu.addItem((item) => {
-        item.setTitle("Styler: Toggle Italic").setIcon("italic").onClick(() => this.styleManager.toggleStyle(editor, "italic"));
+        item.setTitle("Styler: Toggle Italic").setIcon("italic").onClick(() => this.styleManager.toggleStyle(editor, "italic", null));
       });
       menu.addItem((item) => {
-        item.setTitle("Styler: Toggle Underline").setIcon("underline").onClick(() => this.styleManager.toggleStyle(editor, "underline"));
+        item.setTitle("Styler: Toggle Underline").setIcon("underline").onClick(() => this.styleManager.toggleStyle(editor, "underline", null));
       });
       menu.addItem((item) => {
         item.setTitle("Styler: Toggle Colored Underline").setIcon("underline").onClick(() => {
@@ -25631,35 +25664,60 @@ var TextStyler = class extends import_obsidian5.Plugin {
         });
       });
       menu.addItem((item) => {
-        item.setTitle("Styler: Toggle Strikethrough").setIcon("strikethrough").onClick(() => this.styleManager.toggleStyle(editor, "strike"));
+        item.setTitle("Styler: Toggle Strikethrough").setIcon("strikethrough").onClick(() => this.styleManager.toggleStyle(editor, "strike", null));
       });
       menu.addItem((item) => {
-        item.setTitle("Styler: Toggle Circled Text").setIcon("circle").onClick(() => this.styleManager.toggleStyle(editor, "circled"));
+        item.setTitle("Styler: Toggle Circled Text").setIcon("circle").onClick(() => {
+          var _a;
+          const color = (_a = this.statusBar) == null ? void 0 : _a.getCurrentTextColor();
+          if (color) {
+            this.styleManager.toggleStyle(editor, "circled", color);
+          } else {
+            new import_obsidian5.Notice("Text Styler: Select a text color first to use for the circle.");
+          }
+        });
       });
       menu.addSeparator();
       menu.addItem((item) => {
-        item.setTitle("Styler: Remove Colors").setIcon("eraser").onClick(() => {
+        item.setTitle("Styler: Remove Colors/Highlight").setIcon("eraser").onClick(() => {
           this.styleManager.toggleStyle(editor, "color", null);
           this.styleManager.toggleStyle(editor, "highlight", null);
+          this.styleManager.toggleStyle(editor, "colored-underline", null);
         });
       });
       menu.addItem((item) => {
         item.setTitle("Styler: Remove All Styles").setIcon("trash").onClick(() => this.styleManager.removeAllStyling(editor));
       });
     };
-    this.styleManager = new StyleManager();
+    this.styleManager = new StyleManager(this);
   }
   async onload() {
     console.log("Loading Text Styler Plugin");
     await this.loadSettings();
     this.statusBarItem = this.addStatusBarItem();
-    this.statusBar = new StylerStatusBar(this, this.statusBarItem);
+    if (this.statusBarItem) {
+      this.statusBar = new StylerStatusBar(this, this.statusBarItem);
+    } else {
+      console.error("Text Styler: Could not create status bar item.");
+    }
     this.addSettingTab(new StylerSettingsTab(this.app, this));
-    this.addStyleCommand("toggle-bold", "Toggle Bold", "bold");
-    this.addStyleCommand("toggle-italic", "Toggle Italic", "italic");
-    this.addStyleCommand("toggle-underline", "Toggle Underline", "underline");
-    this.addStyleCommand("toggle-strike", "Toggle Strikethrough", "strike");
-    this.addStyleCommand("toggle-circled", "Toggle Circled Text", "circled");
+    this.addSimpleToggleCommand("toggle-bold", "Toggle Bold", "bold");
+    this.addSimpleToggleCommand("toggle-italic", "Toggle Italic", "italic");
+    this.addSimpleToggleCommand("toggle-underline", "Toggle Underline", "underline");
+    this.addSimpleToggleCommand("toggle-strike", "Toggle Strikethrough", "strike");
+    this.addCommand({
+      id: "toggle-circled",
+      name: "Toggle Circled Text",
+      editorCallback: (editor) => {
+        var _a;
+        const color = (_a = this.statusBar) == null ? void 0 : _a.getCurrentTextColor();
+        if (color) {
+          this.styleManager.toggleStyle(editor, "circled", color);
+        } else {
+          new import_obsidian5.Notice("Text Styler: Select a text color first to use for the circle.");
+        }
+      }
+    });
     this.addCommand({
       id: "toggle-colored-underline",
       name: "Toggle Colored Underline",
@@ -25681,6 +25739,8 @@ var TextStyler = class extends import_obsidian5.Plugin {
         const color = (_a = this.statusBar) == null ? void 0 : _a.getCurrentTextColor();
         if (color) {
           this.styleManager.toggleStyle(editor, "color", color);
+        } else {
+          new import_obsidian5.Notice("Text Styler: No text color selected.");
         }
       }
     });
@@ -25692,6 +25752,8 @@ var TextStyler = class extends import_obsidian5.Plugin {
         const color = (_a = this.statusBar) == null ? void 0 : _a.getCurrentHighlightColor();
         if (color) {
           this.styleManager.toggleStyle(editor, "highlight", color);
+        } else {
+          new import_obsidian5.Notice("Text Styler: No highlight color selected.");
         }
       }
     });
@@ -25726,6 +25788,26 @@ var TextStyler = class extends import_obsidian5.Plugin {
       name: "Change Current Highlight Color Slot",
       callback: () => this.openColorChangeModal("highlight")
     });
+    this.addCommand({
+      id: "cycle-text-color-forward",
+      name: "Change Text Color Slot Forward",
+      callback: () => this.cycleColorSlot("text", "forward")
+    });
+    this.addCommand({
+      id: "cycle-text-color-backward",
+      name: "Change Text Color Slot Backward",
+      callback: () => this.cycleColorSlot("text", "backward")
+    });
+    this.addCommand({
+      id: "cycle-highlight-color-forward",
+      name: "Change Highlight Color Slot Forward",
+      callback: () => this.cycleColorSlot("highlight", "forward")
+    });
+    this.addCommand({
+      id: "cycle-highlight-color-backward",
+      name: "Change Highlight Color Slot Backward",
+      callback: () => this.cycleColorSlot("highlight", "backward")
+    });
     this.registerEvent(
       this.app.workspace.on("editor-menu", this.handleEditorMenu)
     );
@@ -25742,12 +25824,12 @@ var TextStyler = class extends import_obsidian5.Plugin {
       this.statusBarItem.remove();
     }
   }
-  // Helper to add styling commands
-  addStyleCommand(id, name, styleType) {
+  // Helper to add simple toggle commands (no value needed)
+  addSimpleToggleCommand(id, name, styleType) {
     this.addCommand({
       id,
       name,
-      editorCallback: (editor, view) => {
+      editorCallback: (editor) => {
         this.styleManager.toggleStyle(editor, styleType, null);
       }
     });
@@ -25755,7 +25837,8 @@ var TextStyler = class extends import_obsidian5.Plugin {
   openColorChangeModal(type) {
     const index = type === "text" ? this.settings.selectedTextColorIndex : this.settings.selectedHighlightColorIndex;
     const colors = type === "text" ? this.settings.textColors : this.settings.highlightColors;
-    const currentColor = colors[index];
+    const safeIndex = Math.max(0, Math.min(index, colors.length - 1));
+    const currentColor = colors[safeIndex] || (type === "text" ? DEFAULT_SETTINGS.textColors[0] : DEFAULT_SETTINGS.highlightColors[0]);
     new ColorModal({
       app: this.app,
       plugin: this,
@@ -25763,49 +25846,85 @@ var TextStyler = class extends import_obsidian5.Plugin {
       colorType: type,
       onSubmit: (newColorHex) => {
         var _a;
-        colors[index] = newColorHex;
+        if (safeIndex < colors.length) {
+          colors[safeIndex] = newColorHex;
+        }
         this.saveSettings();
         (_a = this.statusBar) == null ? void 0 : _a.rebuild();
       }
     }).open();
+  }
+  async cycleColorSlot(type, direction) {
+    var _a;
+    if (type === "text") {
+      const currentIdx = this.settings.selectedTextColorIndex;
+      const slotCount = this.settings.textColorSlots;
+      if (slotCount <= 0)
+        return;
+      let nextIdx;
+      if (direction === "forward") {
+        nextIdx = (currentIdx + 1) % slotCount;
+      } else {
+        nextIdx = (currentIdx - 1 + slotCount) % slotCount;
+      }
+      this.settings.selectedTextColorIndex = nextIdx;
+    } else {
+      const currentIdx = this.settings.selectedHighlightColorIndex;
+      const slotCount = this.settings.highlightColorSlots;
+      if (slotCount <= 0)
+        return;
+      let nextIdx;
+      if (direction === "forward") {
+        nextIdx = (currentIdx + 1) % slotCount;
+      } else {
+        nextIdx = (currentIdx - 1 + slotCount) % slotCount;
+      }
+      this.settings.selectedHighlightColorIndex = nextIdx;
+    }
+    await this.saveSettings();
+    (_a = this.statusBar) == null ? void 0 : _a.updateSelectedVisuals();
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
     this.ensureColorArraysMatchSlots();
   }
   async saveSettings(resizeArrays = false) {
-    var _a;
     if (resizeArrays) {
       this.ensureColorArraysMatchSlots();
     }
     await this.saveData(this.settings);
-    (_a = this.statusBar) == null ? void 0 : _a.updateSelectedVisuals();
   }
-  // Adjust color arrays if slot count changed
   ensureColorArraysMatchSlots() {
+    var _a, _b;
     const { textColorSlots, textColors, highlightColorSlots, highlightColors } = this.settings;
-    const defaultTextColor = "#000000";
-    const defaultHighlightColor = "#ffff00";
-    if (textColors.length !== textColorSlots) {
-      const newTextColors = Array(textColorSlots).fill(defaultTextColor);
-      for (let i2 = 0; i2 < Math.min(textColors.length, textColorSlots); i2++) {
-        newTextColors[i2] = textColors[i2];
+    const defaultTextColor = DEFAULT_SETTINGS.textColors[0] || "#000000";
+    const defaultHighlightColor = DEFAULT_SETTINGS.highlightColors[0] || "#ffff00";
+    if (!Array.isArray(this.settings.textColors) || this.settings.textColors.length !== this.settings.textColorSlots) {
+      const newTextColors = Array(this.settings.textColorSlots).fill(defaultTextColor);
+      if (Array.isArray(this.settings.textColors)) {
+        for (let i2 = 0; i2 < Math.min(this.settings.textColors.length, this.settings.textColorSlots); i2++) {
+          newTextColors[i2] = this.settings.textColors[i2];
+        }
       }
       this.settings.textColors = newTextColors;
     }
-    if (highlightColors.length !== highlightColorSlots) {
-      const newHighlightColors = Array(highlightColorSlots).fill(defaultHighlightColor);
-      for (let i2 = 0; i2 < Math.min(highlightColors.length, highlightColorSlots); i2++) {
-        newHighlightColors[i2] = highlightColors[i2];
+    if (!Array.isArray(this.settings.highlightColors) || this.settings.highlightColors.length !== this.settings.highlightColorSlots) {
+      const newHighlightColors = Array(this.settings.highlightColorSlots).fill(defaultHighlightColor);
+      if (Array.isArray(this.settings.highlightColors)) {
+        for (let i2 = 0; i2 < Math.min(this.settings.highlightColors.length, this.settings.highlightColorSlots); i2++) {
+          newHighlightColors[i2] = this.settings.highlightColors[i2];
+        }
       }
       this.settings.highlightColors = newHighlightColors;
     }
-    if (this.settings.selectedTextColorIndex >= textColorSlots) {
-      this.settings.selectedTextColorIndex = 0;
+    if (this.settings.coloredUnderlineThickness === void 0 || this.settings.coloredUnderlineThickness === null || typeof this.settings.coloredUnderlineThickness !== "number") {
+      this.settings.coloredUnderlineThickness = DEFAULT_SETTINGS.coloredUnderlineThickness;
     }
-    if (this.settings.selectedHighlightColorIndex >= highlightColorSlots) {
-      this.settings.selectedHighlightColorIndex = 0;
+    if (this.settings.circleThickness === void 0 || this.settings.circleThickness === null || typeof this.settings.circleThickness !== "number") {
+      this.settings.circleThickness = DEFAULT_SETTINGS.circleThickness;
     }
+    this.settings.selectedTextColorIndex = Math.max(0, Math.min((_a = this.settings.selectedTextColorIndex) != null ? _a : 0, this.settings.textColorSlots - 1));
+    this.settings.selectedHighlightColorIndex = Math.max(0, Math.min((_b = this.settings.selectedHighlightColorIndex) != null ? _b : 0, this.settings.highlightColorSlots - 1));
   }
 };
 /*! Bundled license information:

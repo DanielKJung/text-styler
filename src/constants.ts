@@ -5,6 +5,10 @@ export const DEFAULT_COLOR_SLOTS = 5;
 export const DEFAULT_TEXT_COLOR = '#000000';
 export const DEFAULT_HIGHLIGHT_COLOR = '#ffff00'; // Yellow default highlight
 
+export const DEFAULT_COLORED_UNDERLINE_THICKNESS = 3; // Default pixels
+export const DEFAULT_CIRCLE_THICKNESS = 1;          // Default pixels
+
+
 // Base class prefix to avoid conflicts
 export const CLASS_PREFIX = 'styler-';
 
@@ -41,4 +45,8 @@ export const DEFAULT_SETTINGS: Readonly<PluginSettings> = {
         "#d3d3d3", // Light Grey
     ],
     selectedHighlightColorIndex: 0,
+
+    coloredUnderlineThickness: DEFAULT_COLORED_UNDERLINE_THICKNESS,
+    circleThickness: DEFAULT_CIRCLE_THICKNESS,
+
 };

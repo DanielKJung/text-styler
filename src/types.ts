@@ -9,6 +9,9 @@ export interface PluginSettings {
     favoriteHighlightColors: string[]; // Palette for highlight color modal
     selectedHighlightColorIndex: number;
   
+    coloredUnderlineThickness: number; // Thickness in pixels
+    circleThickness: number;          // Thickness in pixels
+  
     // Could add default states for toggles later if needed
   }
   

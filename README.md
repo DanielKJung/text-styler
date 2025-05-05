@@ -2,7 +2,8 @@
 
 This plugin for [Obsidian](https://obsidian.md/) allows you to easily apply and toggle various text styles to your notes using commands, the context menu, or status bar shortcuts. Style your text with colors, highlights, emphasis, and more.
 
-*(Optional: Consider adding a screenshot or GIF demonstrating the plugin here)*
+![Text Styler Plugin in Action](demo/text-styler-demo-fast.gif)
+
 
 ## Credits
 This project is inspired by Erinc Ayaz's Colored Text obsidian plugin.
@@ -17,11 +18,11 @@ https://github.com/erincayaz/obsidian-colored-text
     *   Bold
     *   Italic
     *   Underline (Standard)
-    *   Colored Underline (Uses selected text color, 3px thick)
+    *   Colored Underline (Uses selected text color, configurable thickness)
     *   Strikethrough
     *   Highlight (Uses selected highlight color)
     *   Text Color (Uses selected text color)
-    *   Circled Text (Draws a rounded border around text using text color)
+    *   Circled Text (Draws a rounded border around text using text color, configurable thickness)
 *   **Stackable Styles:** Apply multiple styles to the same text (e.g., bold, colored, and underlined).
 *   **Status Bar Palettes:**
     *   Quick access palettes in the status bar for Text Colors and Highlight Colors.
@@ -60,6 +61,10 @@ https://github.com/erincayaz/obsidian-colored-text
         *   `Text Styler: Remove All Styling`
         *   `Text Styler: Change Current Text Color Slot` (Opens modal for selected slot)
         *   `Text Styler: Change Current Highlight Color Slot` (Opens modal for selected slot)
+        *   `Text Styler: Change Text Color Slot Forward` (Cycles selection to the next text color slot)
+        *   `Text Styler: Change Text Color Slot Backward` (Cycles selection to the previous text color slot)
+        *   `Text Styler: Change Highlight Color Slot Forward` (Cycles selection to the next highlight color slot)
+        *   `Text Styler: Change Highlight Color Slot Backward` (Cycles selection to the previous highlight color slot)
     *   Select text in the editor and use your assigned hotkeys.
 3.  **Context Menu:**
     *   Select text in the editor.

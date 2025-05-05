@@ -3,8 +3,8 @@
 	"name": "Text Styler",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Apply and toggle various text styles like bold, italic, color, highlight, etc. Heavily inspired by Erin Cayaz's Colored Text. Credits to Him.",
-	"author": "Daniel Jung, heavily inspired by Colored Text by Erin Cayaz",
+	"description": "Apply and toggle various text styles like bold, italic, color, highlight, etc. Inspired by Erin Cayaz's Colored Text.",
+	"author": "Daniel Jung, inspired by Colored Text by Erin Cayaz",
 	"authorUrl": "https://github.com/DanielKJung",
 	"isDesktopOnly": false
 }

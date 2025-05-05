@@ -1,6 +1,8 @@
 import { App, PluginSettingTab, Setting, ColorComponent, BaseComponent } from "obsidian";
 import TextStyler from "./main"; // Assuming main class is TextStyler
-import { DEFAULT_SETTINGS, MAX_COLOR_SLOTS } from "./constants";
+import { DEFAULT_SETTINGS, MAX_COLOR_SLOTS, DEFAULT_COLORED_UNDERLINE_THICKNESS, DEFAULT_CIRCLE_THICKNESS } from "./constants";
+
+
 
 export class StylerSettingsTab extends PluginSettingTab {
     plugin: TextStyler;
@@ -65,6 +67,38 @@ export class StylerSettingsTab extends PluginSettingTab {
             .setName("Favorite Highlight Colors")
             .setDesc("Set your favorite highlight colors for the picker modal.");
         this.renderColorPickers(this.favoriteHighlightColorsSetting, this.plugin.settings.favoriteHighlightColors, 'highlight');
+
+        containerEl.createEl("h3", { text: "Style Appearance" });
+
+        new Setting(containerEl)
+            .setName("Colored Underline Thickness")
+            .setDesc("Set the thickness of the colored underline in pixels (e.g., 2, 3, 4).")
+            .addText((text) => text
+                .setPlaceholder(String(DEFAULT_COLORED_UNDERLINE_THICKNESS))
+                .setValue(String(this.plugin.settings.coloredUnderlineThickness))
+                .onChange(async (value) => {
+                    let num = parseInt(value);
+                    if (isNaN(num) || num < 1) num = DEFAULT_COLORED_UNDERLINE_THICKNESS; // Ensure positive integer
+                    this.plugin.settings.coloredUnderlineThickness = num;
+                    await this.plugin.saveSettings();
+                    text.setValue(String(this.plugin.settings.coloredUnderlineThickness)); // Update display just in case
+                })
+            );
+
+        new Setting(containerEl)
+            .setName("Circled Text Border Thickness")
+            .setDesc("Set the thickness of the circled text border in pixels (e.g., 1, 2).")
+            .addText((text) => text
+                .setPlaceholder(String(DEFAULT_CIRCLE_THICKNESS))
+                .setValue(String(this.plugin.settings.circleThickness))
+                .onChange(async (value) => {
+                    let num = parseInt(value);
+                    if (isNaN(num) || num < 1) num = DEFAULT_CIRCLE_THICKNESS; // Ensure positive integer
+                    this.plugin.settings.circleThickness = num;
+                    await this.plugin.saveSettings();
+                    text.setValue(String(this.plugin.settings.circleThickness)); // Update display
+                })
+            );
 
 
     }

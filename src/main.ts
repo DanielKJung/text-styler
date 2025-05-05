@@ -1,20 +1,20 @@
-import { App,Editor, MarkdownView, Menu, Notice, Plugin, PluginManifest } from 'obsidian';
+import { App, Editor, MarkdownView, Menu, Notice, Plugin, PluginManifest, ExtraButtonComponent, TextComponent, MenuItem } from 'obsidian'; // Added missing imports
 import { StylerSettingsTab } from './settingsTab';
 import { StylerStatusBar } from './statusBar';
 import { StyleManager } from './styleManager';
-import { DEFAULT_SETTINGS } from './constants';
+import { DEFAULT_SETTINGS, DEFAULT_COLORED_UNDERLINE_THICKNESS, DEFAULT_CIRCLE_THICKNESS } from './constants'; // Import new defaults
 import { PluginSettings, StyleType } from './types';
-import { ColorModal } from './colorModal'; // Assuming modal exists
+import { ColorModal } from './colorModal';
 
 export default class TextStyler extends Plugin {
     settings: PluginSettings;
     statusBar: StylerStatusBar | null = null;
     styleManager: StyleManager;
-    statusBarItem: HTMLElement | null = null; // Reference to the status bar element
+    statusBarItem: HTMLElement | null = null;
 
     constructor(app: App, manifest: PluginManifest) {
         super(app, manifest);
-        this.styleManager = new StyleManager();
+        this.styleManager = new StyleManager(this); // Pass plugin instance
     }
 
     async onload() {
@@ -23,21 +23,36 @@ export default class TextStyler extends Plugin {
         await this.loadSettings();
 
         // --- Status Bar ---
-        // Create the container element for the status bar items
         this.statusBarItem = this.addStatusBarItem();
-        // Pass the container to the StylerStatusBar class
-        this.statusBar = new StylerStatusBar(this, this.statusBarItem);
+        if (this.statusBarItem) {
+            this.statusBar = new StylerStatusBar(this, this.statusBarItem);
+        } else {
+            console.error("Text Styler: Could not create status bar item.");
+        }
 
 
         // --- Settings Tab ---
         this.addSettingTab(new StylerSettingsTab(this.app, this));
 
         // --- Commands ---
-        this.addStyleCommand('toggle-bold', 'Toggle Bold', 'bold');
-        this.addStyleCommand('toggle-italic', 'Toggle Italic', 'italic');
-        this.addStyleCommand('toggle-underline', 'Toggle Underline', 'underline');
-        this.addStyleCommand('toggle-strike', 'Toggle Strikethrough', 'strike');
-        this.addStyleCommand('toggle-circled', 'Toggle Circled Text', 'circled'); // <-- Add Circled command
+        this.addSimpleToggleCommand('toggle-bold', 'Toggle Bold', 'bold');
+        this.addSimpleToggleCommand('toggle-italic', 'Toggle Italic', 'italic');
+        this.addSimpleToggleCommand('toggle-underline', 'Toggle Underline', 'underline');
+        this.addSimpleToggleCommand('toggle-strike', 'Toggle Strikethrough', 'strike');
+
+        // Circled Text Command (needs color value)
+        this.addCommand({
+            id: 'toggle-circled',
+            name: 'Toggle Circled Text',
+            editorCallback: (editor: Editor) => {
+                const color = this.statusBar?.getCurrentTextColor(); // Get current text color
+                if (color) {
+                    this.styleManager.toggleStyle(editor, 'circled', color); // Pass color as value
+                } else {
+                    new Notice("Text Styler: Select a text color first to use for the circle.");
+                }
+            }
+        });
 
         // Colored Underline Command (needs color value)
         this.addCommand({
@@ -51,18 +66,16 @@ export default class TextStyler extends Plugin {
                   new Notice("Text Styler: No text color selected for underline.");
               }
           }
-      });
+        });
 
-
-
+        // Apply/Remove Color/Highlight Commands
         this.addCommand({
             id: 'apply-text-color',
             name: 'Apply Text Color (Current Slot)',
             editorCallback: (editor: Editor) => {
                 const color = this.statusBar?.getCurrentTextColor();
-                if (color) {
-                    this.styleManager.toggleStyle(editor, 'color', color);
-                }
+                if (color) { this.styleManager.toggleStyle(editor, 'color', color); }
+                else { new Notice("Text Styler: No text color selected."); }
             },
         });
 
@@ -71,9 +84,8 @@ export default class TextStyler extends Plugin {
             name: 'Apply Highlight Color (Current Slot)',
             editorCallback: (editor: Editor) => {
                 const color = this.statusBar?.getCurrentHighlightColor();
-                if (color) {
-                     this.styleManager.toggleStyle(editor, 'highlight', color);
-                }
+                if (color) { this.styleManager.toggleStyle(editor, 'highlight', color); }
+                 else { new Notice("Text Styler: No highlight color selected."); }
             },
         });
 
@@ -81,7 +93,6 @@ export default class TextStyler extends Plugin {
             id: 'remove-text-color',
             name: 'Remove Text Color',
             editorCallback: (editor: Editor) => {
-                // Pass null value to indicate removal of the style type
                 this.styleManager.toggleStyle(editor, 'color', null);
             },
         });
@@ -94,6 +105,7 @@ export default class TextStyler extends Plugin {
             },
         });
 
+        // Remove All Styling Command
         this.addCommand({
             id: 'remove-all-styling',
             name: 'Remove All Styling',
@@ -102,6 +114,7 @@ export default class TextStyler extends Plugin {
              }
         });
 
+        // Change Color Slot Commands
          this.addCommand({
             id: 'change-text-color-slot',
             name: 'Change Current Text Color Slot',
@@ -114,15 +127,38 @@ export default class TextStyler extends Plugin {
             callback: () => this.openColorChangeModal('highlight')
          });
 
+         this.addCommand({
+            id: 'cycle-text-color-forward',
+            name: 'Change Text Color Slot Forward',
+            callback: () => this.cycleColorSlot('text', 'forward'),
+        });
+        this.addCommand({
+            id: 'cycle-text-color-backward',
+            name: 'Change Text Color Slot Backward',
+            callback: () => this.cycleColorSlot('text', 'backward'),
+        });
+        this.addCommand({
+            id: 'cycle-highlight-color-forward',
+            name: 'Change Highlight Color Slot Forward',
+            callback: () => this.cycleColorSlot('highlight', 'forward'),
+        });
+        this.addCommand({
+            id: 'cycle-highlight-color-backward',
+            name: 'Change Highlight Color Slot Backward',
+            callback: () => this.cycleColorSlot('highlight', 'backward'),
+        });
+
+
+
 
         // --- Context Menu ---
         this.registerEvent(
             this.app.workspace.on("editor-menu", this.handleEditorMenu)
         );
 
-        // --- Update status bar on theme change (optional but good) ---
+        // --- Update status bar on theme change ---
         this.registerEvent(this.app.workspace.on("css-change", () => {
-             this.statusBar?.updateSelectedVisuals(); // Re-check contrast, etc.
+             this.statusBar?.updateSelectedVisuals();
         }));
     }
 
@@ -134,13 +170,13 @@ export default class TextStyler extends Plugin {
         }
     }
 
-    // Helper to add styling commands
-    addStyleCommand(id: string, name: string, styleType: StyleType) {
-        this.addCommand({
+    // Helper to add simple toggle commands (no value needed)
+    private addSimpleToggleCommand(id: string, name: string, styleType: StyleType) {
+         this.addCommand({
             id: id,
             name: name,
-            editorCallback: (editor: Editor, view: MarkdownView) => {
-                this.styleManager.toggleStyle(editor, styleType, null);
+            editorCallback: (editor: Editor) => { // view param removed as unused
+                this.styleManager.toggleStyle(editor, styleType, null); // Value is null
             },
         });
     }
@@ -148,47 +184,47 @@ export default class TextStyler extends Plugin {
     // Handle Context Menu
     private handleEditorMenu = (menu: Menu, editor: Editor, view: MarkdownView) => {
         const selection = editor.getSelection();
-        if (!selection) return; // Only show if text selected
+        if (!selection) return; // Only show styling options if text selected
 
-         menu.addItem((item) => {
+         menu.addItem((item: MenuItem) => {
             item.setTitle("Styler: Apply Text Color")
                 .setIcon("palette")
                 .onClick(() => {
                     const color = this.statusBar?.getCurrentTextColor();
                     if (color) this.styleManager.toggleStyle(editor, 'color', color);
+                    else new Notice("Text Styler: No text color selected.");
                 });
         });
-         menu.addItem((item) => {
+         menu.addItem((item: MenuItem) => {
             item.setTitle("Styler: Apply Highlight")
                 .setIcon("highlighter")
                 .onClick(() => {
                      const color = this.statusBar?.getCurrentHighlightColor();
                     if (color) this.styleManager.toggleStyle(editor, 'highlight', color);
+                     else new Notice("Text Styler: No highlight color selected.");
                 });
         });
 
         menu.addSeparator();
 
-        menu.addItem((item) => {
+        menu.addItem((item: MenuItem) => {
             item.setTitle("Styler: Toggle Bold")
                 .setIcon("bold")
-                .onClick(() => this.styleManager.toggleStyle(editor, 'bold'));
+                .onClick(() => this.styleManager.toggleStyle(editor, 'bold', null)); // Pass null explicitly
         });
-         menu.addItem((item) => {
+         menu.addItem((item: MenuItem) => {
             item.setTitle("Styler: Toggle Italic")
                 .setIcon("italic")
-                .onClick(() => this.styleManager.toggleStyle(editor, 'italic'));
+                .onClick(() => this.styleManager.toggleStyle(editor, 'italic', null)); // Pass null explicitly
         });
-        // Add other toggles similarly (underline, strike)
-
-        menu.addItem((item) => { // Toggle Standard Underline
+        menu.addItem((item: MenuItem) => { // Toggle Standard Underline
           item.setTitle("Styler: Toggle Underline")
-              .setIcon("underline") // Standard underline icon
-              .onClick(() => this.styleManager.toggleStyle(editor, 'underline'));
-      });
-       menu.addItem((item) => { // Toggle Colored Underline - NEW
+              .setIcon("underline")
+              .onClick(() => this.styleManager.toggleStyle(editor, 'underline', null)); // Pass null explicitly
+        });
+       menu.addItem((item: MenuItem) => { // Toggle Colored Underline
           item.setTitle("Styler: Toggle Colored Underline")
-              .setIcon("underline") // Reuse underline icon or find better one
+              .setIcon("underline") // Consider a different icon later if available
               .onClick(() => {
                   const color = this.statusBar?.getCurrentTextColor();
                   if (color) {
@@ -197,31 +233,37 @@ export default class TextStyler extends Plugin {
                        new Notice("Text Styler: No text color selected for underline.");
                   }
               });
-      });
-       menu.addItem((item) => { // Toggle Strike - unchanged
+        });
+       menu.addItem((item: MenuItem) => { // Toggle Strike
           item.setTitle("Styler: Toggle Strikethrough")
               .setIcon("strikethrough")
-              .onClick(() => this.styleManager.toggleStyle(editor, 'strike'));
-      });
-       menu.addItem((item) => { // Toggle Circled - NEW
+              .onClick(() => this.styleManager.toggleStyle(editor, 'strike', null)); // Pass null explicitly
+        });
+       menu.addItem((item: MenuItem) => { // Toggle Circled
           item.setTitle("Styler: Toggle Circled Text")
-              .setIcon("circle") // Lucide icon name for circle
-              .onClick(() => this.styleManager.toggleStyle(editor, 'circled'));
-      });
-
-
+              .setIcon("circle")
+              .onClick(() => {
+                    const color = this.statusBar?.getCurrentTextColor();
+                    if (color) {
+                         this.styleManager.toggleStyle(editor, 'circled', color); // Pass text color
+                    } else {
+                         new Notice("Text Styler: Select a text color first to use for the circle.");
+                    }
+              });
+        });
 
         menu.addSeparator();
 
-         menu.addItem((item) => {
-            item.setTitle("Styler: Remove Colors")
+         menu.addItem((item: MenuItem) => {
+            item.setTitle("Styler: Remove Colors/Highlight")
                 .setIcon("eraser")
                 .onClick(() => {
-                    this.styleManager.toggleStyle(editor, 'color', null);
-                    this.styleManager.toggleStyle(editor, 'highlight', null);
+                    this.styleManager.toggleStyle(editor, 'color', null); // Remove color
+                    this.styleManager.toggleStyle(editor, 'highlight', null); // Remove highlight
+                    this.styleManager.toggleStyle(editor, 'colored-underline', null); // Remove colored underline props
                     });
         });
-         menu.addItem((item) => {
+         menu.addItem((item: MenuItem) => {
             item.setTitle("Styler: Remove All Styles")
                 .setIcon("trash")
                 .onClick(() => this.styleManager.removeAllStyling(editor));
@@ -232,7 +274,9 @@ export default class TextStyler extends Plugin {
     openColorChangeModal(type: 'text' | 'highlight') {
         const index = type === 'text' ? this.settings.selectedTextColorIndex : this.settings.selectedHighlightColorIndex;
         const colors = type === 'text' ? this.settings.textColors : this.settings.highlightColors;
-        const currentColor = colors[index];
+        // Ensure index is valid before accessing array
+        const safeIndex = Math.max(0, Math.min(index, colors.length - 1));
+        const currentColor = colors[safeIndex] || (type === 'text' ? DEFAULT_SETTINGS.textColors[0] : DEFAULT_SETTINGS.highlightColors[0]);
 
          new ColorModal({
             app: this.app,
@@ -240,17 +284,49 @@ export default class TextStyler extends Plugin {
             initialColor: currentColor,
             colorType: type,
             onSubmit: (newColorHex) => {
-                colors[index] = newColorHex;
+                 // Ensure index is still valid before assignment (paranoid check)
+                 if (safeIndex < colors.length) {
+                     colors[safeIndex] = newColorHex;
+                 }
                  this.saveSettings();
                  this.statusBar?.rebuild(); // Update cell color visually
             }
         }).open();
     }
 
+    async cycleColorSlot(type: 'text' | 'highlight', direction: 'forward' | 'backward') {
+        if (type === 'text') {
+            const currentIdx = this.settings.selectedTextColorIndex;
+            const slotCount = this.settings.textColorSlots;
+            if (slotCount <= 0) return; // Avoid division by zero or negative index
+            let nextIdx: number;
+            if (direction === 'forward') {
+                nextIdx = (currentIdx + 1) % slotCount;
+            } else { // backward
+                nextIdx = (currentIdx - 1 + slotCount) % slotCount;
+            }
+            this.settings.selectedTextColorIndex = nextIdx;
+        } else { // highlight
+            const currentIdx = this.settings.selectedHighlightColorIndex;
+            const slotCount = this.settings.highlightColorSlots;
+             if (slotCount <= 0) return;
+            let nextIdx: number;
+            if (direction === 'forward') {
+                nextIdx = (currentIdx + 1) % slotCount;
+            } else { // backward
+                nextIdx = (currentIdx - 1 + slotCount) % slotCount;
+            }
+            this.settings.selectedHighlightColorIndex = nextIdx;
+        }
+        // Save the setting and update the status bar visuals
+        await this.saveSettings(); // Use await here for consistency if saveSettings might be async
+        this.statusBar?.updateSelectedVisuals(); // Call the existing method to update the UI
+    }
+
+
     async loadSettings() {
         this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-        // Ensure arrays match slot numbers after loading potentially old settings
-        this.ensureColorArraysMatchSlots();
+        this.ensureColorArraysMatchSlots(); // Ensure new settings are initialized
     }
 
     async saveSettings(resizeArrays = false) {
@@ -258,39 +334,48 @@ export default class TextStyler extends Plugin {
             this.ensureColorArraysMatchSlots();
         }
         await this.saveData(this.settings);
-        // Trigger status bar rebuild if necessary (e.g., slot count changed)
-        // Note: Requires reload for slot count change to take effect in UI creation.
-         this.statusBar?.updateSelectedVisuals(); // Update selection visuals immediately
+        // this.statusBar?.updateSelectedVisuals();
+        // No need to call updateSelectedVisuals here, it's called after specific updates
+
     }
 
-    // Adjust color arrays if slot count changed
     ensureColorArraysMatchSlots() {
         const { textColorSlots, textColors, highlightColorSlots, highlightColors } = this.settings;
-        const defaultTextColor = '#000000';
-        const defaultHighlightColor = '#ffff00';
+        const defaultTextColor = DEFAULT_SETTINGS.textColors[0] || '#000000'; // Use first default or fallback
+        const defaultHighlightColor = DEFAULT_SETTINGS.highlightColors[0] || '#ffff00'; // Use first default or fallback
 
-        if (textColors.length !== textColorSlots) {
-            const newTextColors = Array(textColorSlots).fill(defaultTextColor);
-            for (let i = 0; i < Math.min(textColors.length, textColorSlots); i++) {
-                newTextColors[i] = textColors[i];
+        // Resize/Initialize Text Colors Array
+        if (!Array.isArray(this.settings.textColors) || this.settings.textColors.length !== this.settings.textColorSlots) {
+            const newTextColors = Array(this.settings.textColorSlots).fill(defaultTextColor);
+            if (Array.isArray(this.settings.textColors)) { // Preserve old colors if possible
+                 for (let i = 0; i < Math.min(this.settings.textColors.length, this.settings.textColorSlots); i++) {
+                    newTextColors[i] = this.settings.textColors[i];
+                }
             }
             this.settings.textColors = newTextColors;
         }
 
-         if (highlightColors.length !== highlightColorSlots) {
-            const newHighlightColors = Array(highlightColorSlots).fill(defaultHighlightColor);
-            for (let i = 0; i < Math.min(highlightColors.length, highlightColorSlots); i++) {
-                 newHighlightColors[i] = highlightColors[i];
-            }
+        // Resize/Initialize Highlight Colors Array
+        if (!Array.isArray(this.settings.highlightColors) || this.settings.highlightColors.length !== this.settings.highlightColorSlots) {
+            const newHighlightColors = Array(this.settings.highlightColorSlots).fill(defaultHighlightColor);
+             if (Array.isArray(this.settings.highlightColors)) { // Preserve old colors if possible
+                for (let i = 0; i < Math.min(this.settings.highlightColors.length, this.settings.highlightColorSlots); i++) {
+                    newHighlightColors[i] = this.settings.highlightColors[i];
+                }
+             }
             this.settings.highlightColors = newHighlightColors;
          }
 
-         // Ensure selected index is valid
-         if (this.settings.selectedTextColorIndex >= textColorSlots) {
-            this.settings.selectedTextColorIndex = 0;
+         // Initialize new thickness settings if they don't exist
+         if (this.settings.coloredUnderlineThickness === undefined || this.settings.coloredUnderlineThickness === null || typeof this.settings.coloredUnderlineThickness !== 'number') {
+             this.settings.coloredUnderlineThickness = DEFAULT_SETTINGS.coloredUnderlineThickness;
          }
-          if (this.settings.selectedHighlightColorIndex >= highlightColorSlots) {
-            this.settings.selectedHighlightColorIndex = 0;
+          if (this.settings.circleThickness === undefined || this.settings.circleThickness === null || typeof this.settings.circleThickness !== 'number') {
+             this.settings.circleThickness = DEFAULT_SETTINGS.circleThickness;
          }
+
+         // Ensure selected indices are valid
+         this.settings.selectedTextColorIndex = Math.max(0, Math.min(this.settings.selectedTextColorIndex ?? 0, this.settings.textColorSlots - 1));
+         this.settings.selectedHighlightColorIndex = Math.max(0, Math.min(this.settings.selectedHighlightColorIndex ?? 0, this.settings.highlightColorSlots - 1));
     }
 }

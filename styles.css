@@ -72,10 +72,13 @@
 
 /* Circled Text */
 .styler-circled {
-    border: 1px solid currentColor; /* Use current text color for border */
-    border-radius: 1em; /* Make it rounded (oval/pill shape) */
-    padding: 0.05em 0.3em; /* Add some space inside the border */
-    /* Helps rendering borders/padding correctly when inline elements wrap lines */
+    /* --- MODIFY START --- Use CSS variables --- */
+    border-style: solid; /* Ensure border style is set */
+    border-color: var(--styler-circle-color, currentColor); /* Use variable, fallback to text color */
+    border-width: var(--styler-circle-thickness, 1px); /* Use variable, fallback to 1px */
+    /* --- MODIFY END --- */
+    border-radius: 1em;
+    padding: 0.05em 0.3em;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
 }
@@ -100,7 +103,7 @@
     /* Ensure an underline line is present */
     text-decoration-line: underline;
     text-decoration-color: var(--styler-underline-color, currentColor); /* Fallback to text color */
-    text-decoration-thickness: var(--styler-underline-thickness, auto); /* Fallback to default */
+    text-decoration-thickness: var(--styler-underline-thickness, 3px); /* Fallback to default */
 }
 
 /* --- Combined Decorations --- */
