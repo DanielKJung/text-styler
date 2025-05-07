@@ -101,3 +101,4 @@ Daniel Jung ([@DanielKJung](https://github.com/DanielKJung))
 ## License
 
 This plugin is released under the MIT License. See the [LICENSE](LICENSE) file for details.
+
